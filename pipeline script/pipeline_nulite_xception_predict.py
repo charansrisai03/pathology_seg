@@ -167,16 +167,18 @@ def parse_patch_coordinates(filename):
         return None, None, None
 
 
-def reconstruct_wsi_from_patches(predictions_df, patch_size=256, output_dir=None):
+def reconstruct_wsi_from_patches(predictions_df, original_dir, patch_size=256, output_dir=None):
     """
-    Reconstruct WSI images from classified patches with color-coded overlays.
+    Reconstruct WSI images from classified patches with colored borders on original patches.
+    Places original patch images with colored borders based on TP/TN/FP/FN classification.
     Uses memory-efficient streaming approach for large images.
     
-    Color scheme:
-    - Green (TP & TN): Correct predictions
-    - Yellow (FP): False positives (predicted necrosis but wasn't)
-    - Red (FN): False negatives (missed necrosis)
-    - White: No patch available (white regions from original WSI)
+    Color scheme (border colors):
+    - Green: True Positives (correctly identified necrosis)
+    - Blue: True Negatives (correctly identified non-necrosis)
+    - Yellow: False Positives (predicted necrosis but wasn't)
+    - Red: False Negatives (missed necrosis)
+    - White: No patch available
     """
     if predictions_df.empty:
         print("No predictions to reconstruct.")
@@ -278,41 +280,94 @@ def reconstruct_wsi_from_patches(predictions_df, patch_size=256, output_dir=None
         # Use PIL for memory efficiency with large images
         try:
             from PIL import Image, ImageDraw
+            import glob
             
             # Create image with white background
-            print("  Creating image...")
+            print("  Creating image with original patches and colored borders...")
             wsi_image = Image.new('RGB', (wsi_width, wsi_height), (255, 255, 255))
-            draw = ImageDraw.Draw(wsi_image)
             
-            # Fill in patches
+            # Fill in patches with original images and colored borders
             tp_count, tn_count, fp_count, fn_count = 0, 0, 0, 0
+            border_width = 8  # Border thickness in pixels
             
             for patch_info in patches:
                 x = patch_info['x']
                 y = patch_info['y']
                 predicted = patch_info['predicted']
                 actual = patch_info['actual']
+                filename = patch_info['filename']
                 
-                # Get color
-                color = patch_dict[(x, y)]
-                # Convert BGR to RGB for PIL
-                color_rgb = (color[2], color[1], color[0])
-                
-                # Draw rectangle
-                draw.rectangle(
-                    [(x, y), (x + patch_size, y + patch_size)],
-                    fill=color_rgb
-                )
-                
-                # Count results
+                # Determine classification and color
                 if predicted == 1 and actual == 1:
+                    classification = 'TP'
                     tp_count += 1
+                    color_bgr = colors['TP']
                 elif predicted == 0 and actual == 0:
+                    classification = 'TN'
                     tn_count += 1
+                    color_bgr = colors['TN']
                 elif predicted == 1 and actual == 0:
+                    classification = 'FP'
                     fp_count += 1
+                    color_bgr = colors['FP']
                 elif predicted == 0 and actual == 1:
+                    classification = 'FN'
                     fn_count += 1
+                    color_bgr = colors['FN']
+                else:
+                    classification = 'unknown'
+                    color_bgr = colors['white']
+                
+                # Convert BGR to RGB for PIL
+                color_rgb = (color_bgr[2], color_bgr[1], color_bgr[0])
+                
+                # Try to load original patch image
+                patch_image = None
+                try:
+                    # Search for the patch in original_dir
+                    possible_paths = [
+                        os.path.join(original_dir, filename),
+                        os.path.join(original_dir, '*', filename),
+                        os.path.join(original_dir, '**', filename),
+                    ]
+                    
+                    patch_found = False
+                    # Direct path
+                    if os.path.exists(possible_paths[0]):
+                        patch_image = Image.open(possible_paths[0]).convert('RGB')
+                        patch_found = True
+                    else:
+                        # Search in subdirectories
+                        found_paths = glob.glob(os.path.join(original_dir, '**', filename), recursive=True)
+                        if found_paths:
+                            patch_image = Image.open(found_paths[0]).convert('RGB')
+                            patch_found = True
+                    
+                    if not patch_found:
+                        # If not found, create colored square as fallback
+                        patch_image = Image.new('RGB', (patch_size, patch_size), color_rgb)
+                
+                except Exception as e:
+                    # Fallback: create colored square if patch can't be loaded
+                    patch_image = Image.new('RGB', (patch_size, patch_size), color_rgb)
+                
+                # Resize patch to exact size if needed
+                if patch_image.size != (patch_size, patch_size):
+                    patch_image = patch_image.resize((patch_size, patch_size), Image.Resampling.LANCZOS)
+                
+                # Create a copy to add border
+                patch_with_border = patch_image.copy()
+                draw = ImageDraw.Draw(patch_with_border)
+                
+                # Draw colored border (rectangle outline)
+                border_box = [
+                    (border_width // 2, border_width // 2),
+                    (patch_size - border_width // 2, patch_size - border_width // 2)
+                ]
+                draw.rectangle(border_box, outline=color_rgb, width=border_width)
+                
+                # Paste the patch with border onto the WSI at the correct position
+                wsi_image.paste(patch_with_border, (x, y))
             
             print("  Saving image (this may take a moment)...")
             
@@ -737,7 +792,7 @@ def main():
         organize_images_by_classification(pdf, original_dir, segmented_dir, base_out)
         
         # Reconstruct WSI images from patches with color-coded overlays
-        # reconstruct_wsi_from_patches(pdf, patch_size=256, output_dir=base_out)
+        reconstruct_wsi_from_patches(pdf, original_dir, patch_size=256, output_dir=base_out)
     else:
         # create empty template
         pdf = pd.DataFrame(columns=['Image_Name', 'Source', 'Predicted', 'Probability', 'Actual_Class'])
