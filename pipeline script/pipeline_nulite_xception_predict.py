@@ -180,6 +180,9 @@ def reconstruct_wsi_from_patches(predictions_df, original_dir, patch_size=256, o
     - Red: False Negatives (missed necrosis)
     - White: No patch available
     """
+    import time
+    wsi_recon_start = time.time()
+    
     if predictions_df.empty:
         print("No predictions to reconstruct.")
         return
@@ -403,8 +406,16 @@ def reconstruct_wsi_from_patches(predictions_df, original_dir, patch_size=256, o
             print("  PIL not available. Skipping WSI reconstruction.")
             continue
     
+    # Calculate WSI reconstruction timing
+    wsi_recon_end = time.time()
+    wsi_recon_time = wsi_recon_end - wsi_recon_start
+    wsi_minutes, wsi_seconds = divmod(wsi_recon_time, 60)
+    wsi_hours, wsi_minutes = divmod(wsi_minutes, 60)
+    
     print("="*60)
     print("✅ WSI RECONSTRUCTION COMPLETED")
+    print("="*60)
+    print(f"⏱️  WSI Reconstruction Time: {int(wsi_hours):02d}:{int(wsi_minutes):02d}:{int(wsi_seconds):02d}")
     print("="*60 + "\n")
 
 
