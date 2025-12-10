@@ -735,7 +735,7 @@ def main():
     # 4) prediction
     root_dir = str(Path(__file__).resolve().parents[1])
     svm_path = args.svm_path
-    # If user didn't pass --svm-path, prefer the specific Batch_2 model requested by user
+
     preferred_svm = os.path.join(root_dir, 'Results', 'Final_Model_nulite', 'Batch_16', 'svm_model.joblib')
     if svm_path is None:
         if os.path.exists(preferred_svm):
