@@ -1,0 +1,56 @@
+# ========================
+# 🔴 VERY LARGE DATA FILES (BLOCK THESE)
+# ========================
+Codes and Details/Sample2.zip
+Codes and Details/*.zip
+pipeline script/*.zip
+pipeline script/wsi_reconstructed
+
+# ========================
+# 🔴 TRAINED MODELS (BLOCK FROM GIT)
+# ========================
+Codes and Details/saved_models/
+Codes and Details/segmentation_models/
+*.h5
+*.pth
+*.ckpt
+*.pt
+
+# ========================
+# 🔴 LARGE DATA FILES
+# ========================
+*.csv
+*.npy
+*.npz
+*.pickle
+*.pkl
+*.tfrecord
+
+# ========================
+# 🔴 PYTHON CACHE & ENV
+# ========================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+env/
+venv/
+
+# ========================
+# 🔴 SYSTEM FILES
+# ========================
+.DS_Store
+Thumbs.db
+
+# ========================
+# 🔴 JUPYTER
+# ========================
+.ipynb_checkpoints/
+
+# ========================
+# ✅ ALLOW CODE ONLY
+# ========================
+!*.py
+!*.md
+!*.txt
+pipeline script/wsi_reconstructed/
